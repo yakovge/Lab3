@@ -4,6 +4,11 @@
 
 #define BUF_SIZE 8192
 
+/* External functions from start.s */
+extern int system_call(int syscall_num, int arg1, int arg2, int arg3);
+extern void infection(void);
+extern void infector(const char *filename);
+
 /* Buffer for directory entries */
 char buf[BUF_SIZE];
 

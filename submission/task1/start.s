@@ -9,62 +9,48 @@ section .bss
 section .text
     global _start
     global system_call
+    extern strlen
 
 ; Entry point - sets up stack and calls main
 _start:
-    pop     dword ecx              ; argc
-    mov     esi, esp               ; argv pointer
-    push    ecx                    ; push argc for main
-    push    esi                    ; push argv for main
-    call    main
+    pop    dword ecx    ; ecx = argc
+    mov    esi,esp      ; esi = argv
+    mov     eax,ecx     ; put the number of arguments into eax
+    shl     eax,2       ; compute the size of argv in bytes
+    add     eax,esi     ; add the size to the address of argv
+    add     eax,4       ; skip NULL at the end of argv
+    push    dword eax   ; char *envp[]
+    push    dword esi   ; char* argv[]
+    push    dword ecx   ; int argc
 
-    ; Exit with return value from main
-    mov     ebx, eax               ; exit code
-    mov     eax, 1                 ; sys_exit
+    call    main        ; int main( int argc, char *argv[], char *envp[] )
+
+    mov     ebx,eax
+    mov     eax,1
     int     0x80
+    nop
 
 ; System call wrapper (CDECL calling convention)
-; int system_call(int syscall_num, int arg1, int arg2, int arg3)
 system_call:
-    push    ebp
+    push    ebp             ; Save caller state
     mov     ebp, esp
-    push    ebx
-    push    ecx
-    push    edx
+    sub     esp, 4          ; Leave space for local var on stack
+    pushad                  ; Save some more caller state
 
-    mov     eax, [ebp+8]           ; syscall number
-    mov     ebx, [ebp+12]          ; arg1
-    mov     ecx, [ebp+16]          ; arg2
-    mov     edx, [ebp+20]          ; arg3
-    int     0x80
-
-    pop     edx
-    pop     ecx
-    pop     ebx
-    pop     ebp
-    ret
-
-; strlen function - returns length of null-terminated string
-; int strlen(char *s)
-strlen:
-    push    ebp
-    mov     ebp, esp
-    push    edi
-
-    mov     edi, [ebp+8]           ; string pointer
-    xor     eax, eax               ; length = 0
-.strlen_loop:
-    cmp     byte [edi + eax], 0
-    je      .strlen_done
-    inc     eax
-    jmp     .strlen_loop
-.strlen_done:
-    pop     edi
-    pop     ebp
-    ret
+    mov     eax, [ebp+8]    ; Copy function args to registers: leftmost...
+    mov     ebx, [ebp+12]   ; Next argument...
+    mov     ecx, [ebp+16]   ; Next argument...
+    mov     edx, [ebp+20]   ; Next argument...
+    int     0x80            ; Transfer control to operating system
+    mov     [ebp-4], eax    ; Save returned value...
+    popad                   ; Restore caller state (registers)
+    mov     eax, [ebp-4]    ; place returned value where caller can see it
+    add     esp, 4          ; Restore caller state
+    pop     ebp             ; Restore caller state
+    ret                     ; Back to caller
 
 ; Main function
-; int main(char **argv, int argc)
+; int main(int argc, char *argv[], char *envp[])
 main:
     push    ebp
     mov     ebp, esp
@@ -72,10 +58,10 @@ main:
     push    esi
     push    edi
 
-    mov     esi, [ebp+8]           ; argv
-    mov     edi, [ebp+12]          ; argc
+    mov     edi, [ebp+8]           ; argc
+    mov     esi, [ebp+12]          ; argv
 
-    ; Task 1.A: Print all arguments to stderr
+    ; Task 1.A: Print all arguments to stdout
     xor     ebx, ebx               ; i = 0
 .print_args_loop:
     cmp     ebx, edi
@@ -85,7 +71,7 @@ main:
     mov     eax, [esi + ebx*4]
     push    eax
 
-    ; Get string length
+    ; Get string length using strlen from util.c
     push    eax
     call    strlen
     add     esp, 4
