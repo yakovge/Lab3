@@ -240,12 +240,8 @@ encode:
     cmp     al, 'Z'
     jg      .write_char
 
-    ; Encode: add 3 with wrap-around
+    ; Encode: add 3
     add     al, 3
-    cmp     al, 'Z'
-    jle     .store_char
-    sub     al, 26              ; wrap around to 'A'
-.store_char:
     mov     [buffer], al
 
 .write_char:
