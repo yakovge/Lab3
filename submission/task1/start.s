@@ -9,7 +9,6 @@ section .bss
 section .text
     global _start
     global system_call
-    extern strlen
 
 ; Entry point - sets up stack and calls main
 _start:
@@ -45,6 +44,25 @@ system_call:
     pop     ebp
     ret
 
+; strlen function - returns length of null-terminated string
+; int strlen(char *s)
+strlen:
+    push    ebp
+    mov     ebp, esp
+    push    edi
+
+    mov     edi, [ebp+8]           ; string pointer
+    xor     eax, eax               ; length = 0
+.strlen_loop:
+    cmp     byte [edi + eax], 0
+    je      .strlen_done
+    inc     eax
+    jmp     .strlen_loop
+.strlen_done:
+    pop     edi
+    pop     ebp
+    ret
+
 ; Main function
 ; int main(char **argv, int argc)
 main:
@@ -75,20 +93,20 @@ main:
 
     pop     eax                    ; restore string pointer
 
-    ; Write to stderr (fd=2)
+    ; Write to stdout (fd=1)
     push    ecx                    ; save length
     push    ebx                    ; save counter
 
     mov     edx, ecx               ; length
     mov     ecx, eax               ; buffer
-    mov     ebx, 2                 ; stderr
+    mov     ebx, 1                 ; stdout
     mov     eax, 4                 ; sys_write
     int     0x80
 
     ; Write newline
     mov     edx, 1
     mov     ecx, newline
-    mov     ebx, 2
+    mov     ebx, 1
     mov     eax, 4
     int     0x80
 
