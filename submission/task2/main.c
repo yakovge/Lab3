@@ -14,7 +14,7 @@ char dot_dir[] = ".";
 char err_open[] = "Error opening directory\n";
 char err_getdents[] = "Error reading directory\n";
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[], char *envp[]) {
     int fd;
     int nread;
     int pos;
