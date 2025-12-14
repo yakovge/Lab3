@@ -60,9 +60,8 @@ int main(int argc, char **argv) {
     while (pos < nread) {
         d = (struct linux_dirent *)(buf + pos);
 
-        /* Check if prefix matches (if -a flag given) */
         if (attach_mode) {
-            /* Only process files matching prefix */
+            /* -a flag: only print files matching prefix */
             if (strncmp(d->d_name, prefix, prefix_len) == 0) {
                 /* Print filename */
                 system_call(SYS_WRITE, STDOUT, (int)d->d_name, strlen(d->d_name));
@@ -73,13 +72,10 @@ int main(int argc, char **argv) {
 
                 /* Print VIRUS ATTACHED message */
                 system_call(SYS_WRITE, STDOUT, (int)virus_msg, strlen(virus_msg));
-            } else {
-                /* Print filename without virus message */
-                system_call(SYS_WRITE, STDOUT, (int)d->d_name, strlen(d->d_name));
-                system_call(SYS_WRITE, STDOUT, (int)newline, 1);
             }
+            /* Non-matching files are not printed when -a is given */
         } else {
-            /* No -a flag: just print all filenames */
+            /* No -a flag: print all filenames */
             system_call(SYS_WRITE, STDOUT, (int)d->d_name, strlen(d->d_name));
             system_call(SYS_WRITE, STDOUT, (int)newline, 1);
         }
