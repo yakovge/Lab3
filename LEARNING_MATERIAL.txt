@@ -1,0 +1,246 @@
+================================================================
+LAB 3 LEARNING MATERIAL: Assembly Language & System Calls
+================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. Assembly Basics (x86 32-bit)
+2. Registers
+3. System Calls
+4. CDECL Calling Convention
+5. Stack Operations
+6. Common TA Questions & Answers
+
+================================================================
+1. ASSEMBLY BASICS (x86 32-bit)
+================================================================
+
+INSTRUCTION FORMAT:
+  operation destination, source
+
+COMMON INSTRUCTIONS:
+  mov eax, 5       ; eax = 5
+  mov eax, ebx     ; eax = ebx
+  mov eax, [ebx]   ; eax = memory at address ebx
+  mov [ebx], eax   ; memory at ebx = eax
+
+  add eax, 1       ; eax = eax + 1
+  sub eax, 1       ; eax = eax - 1
+  inc eax          ; eax++
+  dec eax          ; eax--
+
+  cmp eax, 5       ; compare eax with 5 (sets flags)
+  jmp label        ; unconditional jump
+  je  label        ; jump if equal (ZF=1)
+  jne label        ; jump if not equal
+  jl  label        ; jump if less (signed)
+  jg  label        ; jump if greater
+  jle label        ; jump if less or equal
+  jge label        ; jump if greater or equal
+
+  push eax         ; push eax onto stack
+  pop eax          ; pop from stack into eax
+
+  call func        ; call function (pushes return address)
+  ret              ; return from function
+
+  int 0x80         ; trigger software interrupt (system call)
+
+================================================================
+2. REGISTERS (32-bit x86)
+================================================================
+
+GENERAL PURPOSE:
+  EAX - Accumulator, return value
+  EBX - Base register, syscall arg1
+  ECX - Counter, syscall arg2
+  EDX - Data, syscall arg3
+  ESI - Source index
+  EDI - Destination index
+
+SPECIAL:
+  ESP - Stack Pointer (top of stack)
+  EBP - Base Pointer (frame pointer)
+  EIP - Instruction Pointer (next instruction)
+
+REGISTER PRESERVATION (CDECL):
+  Callee-saved: EBX, ESI, EDI, EBP (must preserve!)
+  Caller-saved: EAX, ECX, EDX (may be trashed)
+
+================================================================
+3. SYSTEM CALLS
+================================================================
+
+HOW TO MAKE A SYSTEM CALL:
+  1. Put syscall number in EAX
+  2. Put arguments in EBX, ECX, EDX, ESI, EDI
+  3. Execute: int 0x80
+  4. Return value is in EAX (negative = error)
+
+SYSCALLS USED IN THIS LAB:
+--------------------------
+| # | Name     | EBX      | ECX      | EDX      |
+|---|----------|----------|----------|----------|
+| 1 | exit     | code     | -        | -        |
+| 3 | read     | fd       | buffer   | count    |
+| 4 | write    | fd       | buffer   | count    |
+| 5 | open     | pathname | flags    | mode     |
+| 6 | close    | fd       | -        | -        |
+|141| getdents | fd       | buffer   | count    |
+
+OPEN FLAGS:
+  O_RDONLY = 0
+  O_WRONLY = 1
+  O_RDWR   = 2
+  O_CREAT  = 0x40
+  O_TRUNC  = 0x200
+  O_APPEND = 0x400
+
+EXAMPLE - Write "Hi" to stdout:
+  section .data
+      msg: db "Hi", 10    ; "Hi\n"
+  section .text
+      mov eax, 4          ; sys_write
+      mov ebx, 1          ; fd = stdout
+      mov ecx, msg        ; buffer
+      mov edx, 3          ; length
+      int 0x80
+
+================================================================
+4. CDECL CALLING CONVENTION
+================================================================
+
+WHEN CALLING A FUNCTION:
+  1. Push arguments RIGHT-TO-LEFT
+  2. Call function
+  3. Clean up stack (add esp, n*4)
+
+INSIDE A FUNCTION:
+  1. push ebp           ; save old base pointer
+     mov ebp, esp       ; set new base pointer
+  2. Access arguments:
+     [ebp+8]  = first argument
+     [ebp+12] = second argument
+     [ebp+16] = third argument
+  3. Before return:
+     pop ebp
+     ret
+
+STACK LAYOUT DURING FUNCTION:
+  [ebp+16] = arg3
+  [ebp+12] = arg2
+  [ebp+8]  = arg1
+  [ebp+4]  = return address
+  [ebp]    = saved ebp
+  [ebp-4]  = local var 1
+
+EXAMPLE:
+  ; Calling: int add(int a, int b)
+  push 5           ; b = 5
+  push 3           ; a = 3
+  call add
+  add esp, 8       ; clean up 2 arguments
+
+  ; Inside add:
+  add:
+      push ebp
+      mov ebp, esp
+      mov eax, [ebp+8]   ; a
+      add eax, [ebp+12]  ; a + b
+      pop ebp
+      ret
+
+================================================================
+5. _start AND PROGRAM ENTRY
+================================================================
+
+WHY WE NEED _start:
+  - Programs don't start at main()
+  - _start is the TRUE entry point
+  - Normal: C library provides _start which calls main
+  - Here: We write our own _start
+
+WHAT _start DOES:
+  1. Get argc and argv from stack
+  2. Set up arguments for main
+  3. Call main
+  4. Call sys_exit with main's return value
+
+STACK AT _start:
+  [esp]     = argc
+  [esp+4]   = argv[0]
+  [esp+8]   = argv[1]
+  ...
+
+================================================================
+6. COMMON TA QUESTIONS & ANSWERS
+================================================================
+
+Q: Why don't we use printf?
+A: printf is a C library function. We're not linking to libc,
+   so we use sys_write directly for output.
+
+Q: What is int 0x80?
+A: It triggers software interrupt 0x80, which transfers control
+   to the kernel to execute the system call in EAX.
+
+Q: Why push ebp; mov ebp,esp at function start?
+A: Creates a stack frame. EBP provides stable reference to
+   arguments ([ebp+8]) and locals ([ebp-4]).
+
+Q: What's the difference between open() and fopen()?
+A: open() is a system call returning file descriptor (int).
+   fopen() is a library function returning FILE* stream.
+   We use open() since we can't use library functions.
+
+Q: How does the encoder add 3 to letters?
+A: Characters are just bytes. 'A' = 65. Adding 3: 65+3 = 68 = 'D'.
+   We check if byte is between 'A' (65) and 'Z' (90) first.
+
+Q: What is getdents?
+A: System call to read directory entries. Returns variable-length
+   structures. Each entry has d_reclen telling its size.
+
+Q: Why code_start and code_end labels?
+A: They mark the virus code boundaries. The size of code to
+   attach = code_end - code_start.
+
+Q: What does O_APPEND do?
+A: Opens file so all writes go to the end. This is how we
+   "attach" virus code - we append to existing file content.
+
+Q: Why preserve EBX, ESI, EDI?
+A: CDECL convention says callee must not change these.
+   If we use them, we must save (push) and restore (pop).
+
+================================================================
+QUICK REFERENCE CHEAT SHEET
+================================================================
+
+SYSTEM CALL TEMPLATE:
+  mov eax, SYSCALL_NUM
+  mov ebx, ARG1
+  mov ecx, ARG2
+  mov edx, ARG3
+  int 0x80
+
+FUNCTION TEMPLATE:
+  func:
+      push ebp
+      mov ebp, esp
+      push ebx            ; save if using
+      ; ... code ...
+      ; access [ebp+8], [ebp+12] for args
+      pop ebx
+      pop ebp
+      ret
+
+FILE DESCRIPTORS:
+  0 = stdin
+  1 = stdout
+  2 = stderr
+
+COMMON OPEN FLAGS:
+  Read:   0
+  Write:  0x241 (O_WRONLY|O_CREAT|O_TRUNC)
+  Append: 0x401 (O_WRONLY|O_APPEND)

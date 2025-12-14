@@ -1,0 +1,90 @@
+============================================================
+HOW TO SOLVE TASK 2: Directory Listing & Virus Attachment
+============================================================
+
+OVERVIEW
+--------
+Task 2 combines C and assembly to:
+- List all files in current directory using sys_getdents
+- With -a{prefix}: attach "virus" code to matching files
+
+KEY CONCEPTS
+------------
+1. sys_getdents (syscall 141):
+   - Returns directory entries in a buffer
+   - Each entry has variable length (d_reclen)
+   - Must iterate using d_reclen offsets
+
+2. struct linux_dirent:
+   - d_ino:    inode number
+   - d_off:    offset to next entry
+   - d_reclen: THIS entry's length
+   - d_name:   filename (null-terminated)
+
+TASK 2.A: Directory Listing (C code)
+------------------------------------
+1. Open current directory: open(".", O_RDONLY)
+2. Call sys_getdents(fd, buffer, 8192)
+3. Iterate through buffer:
+   pos = 0;
+   while (pos < nread) {
+       d = (struct linux_dirent *)(buf + pos);
+       print d->d_name
+       pos += d->d_reclen;  // IMPORTANT: variable size!
+   }
+
+4. If -a{prefix} given:
+   - Only print files starting with prefix
+   - Use strncmp(d->d_name, prefix, prefix_len)
+
+TASK 2.B: Virus Attachment (Assembly)
+-------------------------------------
+The assembly part has two functions between code_start/code_end:
+
+1. infection():
+   - Simply print "Hello, Infected File"
+   - One sys_write call:
+     mov eax, 4          ; sys_write
+     mov ebx, 1          ; stdout
+     mov ecx, message    ; buffer
+     mov edx, length     ; count
+     int 0x80
+
+2. infector(char *filename):
+   - Open file for append:
+     sys_open(filename, O_WRONLY|O_APPEND, 0)
+     flags = 0x401
+
+   - Write virus code:
+     sys_write(fd, code_start, code_end - code_start)
+
+   - Close file:
+     sys_close(fd)
+
+LABELS code_start AND code_end
+------------------------------
+These labels mark the virus code boundaries:
+- code_start: placed before infection()
+- code_end: placed after infector()
+- Virus size = code_end - code_start
+
+BUILD & TEST
+------------
+$ make
+$ ./virus                    # List all files
+$ ./virus -aAB               # List only files starting with "AB"
+$ touch ABtest1 ABtest2      # Create test files
+$ chmod u+wx ABtest1 ABtest2
+$ ./virus -aAB               # Attaches virus to ABtest1, ABtest2
+
+SAFETY WARNING
+--------------
+BE CAREFUL with -a flag! It modifies files!
+- Test with dummy files only
+- Don't use prefix that matches your source code
+- Keep backups!
+
+ERROR HANDLING
+--------------
+- Exit with code 0x55 on errors
+- Check return values from sys_open and sys_getdents
