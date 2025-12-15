@@ -30,8 +30,8 @@ struct linux_dirent {
 };
 
 /* External functions from start.s */
-extern int system_call();
-extern void infection();
+extern int system_call(int syscall_num, int arg1, int arg2, int arg3);
+extern void infection(void);
 extern void infector(char *filename);
 
 /* Buffer for directory entries */
