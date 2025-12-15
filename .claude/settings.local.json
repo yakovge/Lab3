@@ -7,7 +7,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(print only the filenames for which the prefix matches\"\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(rm:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nClean submission folder to match instructions exactly\n\nOnly include required files per instructions:\n- task1: start.s, makefile\n- task2: main.c, start.s, makefile\n\nRemoved: build artifacts, util.c/h, dirent.h (course-provided)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")"
     ]
   }
 }
