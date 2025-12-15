@@ -1,13 +1,38 @@
 /* main.c - Task 2: Directory listing and virus attachment */
 #include "util.h"
-#include "dirent.h"
 
 #define BUF_SIZE 8192
 
+/* System call numbers */
+#define SYS_EXIT 1
+#define SYS_WRITE 4
+#define SYS_OPEN 5
+#define SYS_CLOSE 6
+#define SYS_GETDENTS 141
+
+/* File descriptors */
+#define STDIN 0
+#define STDOUT 1
+#define STDERR 2
+
+/* Open flags */
+#define O_RDONLY 0
+
+/* Error exit code */
+#define ERROR_EXIT 0x55
+
+/* Directory entry structure for getdents (syscall 141) */
+struct linux_dirent {
+    unsigned long  d_ino;
+    unsigned long  d_off;
+    unsigned short d_reclen;
+    char           d_name[1];
+};
+
 /* External functions from start.s */
-extern int system_call(int syscall_num, int arg1, int arg2, int arg3);
-extern void infection(void);
-extern void infector(const char *filename);
+extern int system_call();
+extern void infection();
+extern void infector(char *filename);
 
 /* Buffer for directory entries */
 char buf[BUF_SIZE];
