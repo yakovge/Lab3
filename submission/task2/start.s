@@ -103,7 +103,6 @@ infector:
     pop     ebp
     ret
 
-code_end:
+hello_msg: db "Hello, Infected File", 10
 
-section .data
-    hello_msg: db "Hello, Infected File", 10
+code_end:
